@@ -62,6 +62,10 @@ options:
     version_added: "2.0"
     description:
     - Free-form options to be passed to the lvcreate command
+  thinpool:
+    description:
+    - The thin pool volume name. When you want to create thinprovisioning volume, specify thin pool volume name.
+    required: false
 notes:
   - Filesystems on top of the volume are not resized.
 '''
@@ -128,6 +132,7 @@ def main():
             opts=dict(type='str'),
             state=dict(choices=["absent", "present"], default='present'),
             force=dict(type='bool', default='no'),
+            thinpool=dict(type='str'),
         ),
         supports_check_mode=True,
     )
@@ -148,6 +153,7 @@ def main():
     opts = module.params['opts']
     state = module.params['state']
     force = module.boolean(module.params['force'])
+    thinpool = module.params['thinpool']
     size_opt = 'L'
     size_unit = 'm'
 
@@ -201,6 +207,13 @@ def main():
 
     lvs = parse_lvs(current_lvs)
 
+    if thinpool:
+        for test_lv in lvs:
+            if test_lv['name'] == thinpool:
+                break
+        else:
+            module.fail_json(msg="Thin poll %s does not exist." % thinpool)
+
     for test_lv in lvs:
         if test_lv['name'] == lv:
             this_lv = test_lv
@@ -222,7 +235,14 @@ def main():
                 changed = True
             else:
                 lvcreate_cmd = module.get_bin_path("lvcreate", required=True)
-                cmd = "%s %s -n %s -%s %s%s %s %s" % (lvcreate_cmd, yesopt, lv, size_opt, size, size_unit, opts, vg)
+                if thinpool:
+                    if size_opt == 'l':
+                       module.fail_json(changed=False, msg="Thin volume sizing with percentage not supported.")
+                    size_opt = 'V'
+
+                    cmd = "%s %s -n %s -%s %s%s %s -T %s/%s" % (lvcreate_cmd, yesopt, lv, size_opt, size, size_unit, opts, vg, thinpool)
+                else:
+                    cmd = "%s %s -n %s -%s %s%s %s %s" % (lvcreate_cmd, yesopt, lv, size_opt, size, size_unit, opts, vg)
                 rc, _, err = module.run_command(cmd)
                 if rc == 0:
                     changed = True
