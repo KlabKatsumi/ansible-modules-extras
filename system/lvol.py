@@ -91,6 +91,12 @@ EXAMPLES = '''
 
 # Remove the logical volume.
 - lvol: vg=firefly lv=test state=absent force=yes
+
+# Create a thin pool of 512g.
+- lvol: vg=firefly thinpool=testpool size=512g
+
+# Create a thin volume of 128g.
+- lvol: vg=firefly lv=test thinpool=testpool size=128g
 '''
 
 import re
